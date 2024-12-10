@@ -4,7 +4,7 @@ from types import ModuleType
 from docstring_parser import parse
 from langchain_core.pydantic_v1 import BaseModel, Field, create_model
 
-def generate_pydantic_classes(module: ModuleType) -> Dict[str, Type[BaseModel]]:
+def generate_pydantic_classes(module: ModuleType) -> list[Type[BaseModel]]:
     """
     Generate Pydantic classes for each callable (function/method) in a given module.
     
