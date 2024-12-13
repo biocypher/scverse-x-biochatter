@@ -1,85 +1,67 @@
-from pydantic import Field, create_model, BaseModel
+from pydantic import Field, create_model, BaseModel, ConfigDict
+from typing import Optional
 # To include the uuid we need to modify the BaseModel template
 class BaseAPIModel(BaseModel):
     """A base class for all API models.
 
     Adds 'uuid' to default fields.
     """
-
+    #model_extra: dict[str, str] = {"uuid": "some-unique-identifier"}
     uuid: str | None = Field(
         None, description="Unique identifier for the model instance"
     )
+    # Another option to add the uuid without modifying the actual output schema. Can be accessed with model.Config.schema_extra["uuid"]
+    model_config = ConfigDict(arbitrary_types_allowed=True)#, extra="allow")
 
-    class Config:
-        """BaseModel class configuration.
+        
 
-        Ensures the model can be extended without strict type checking on
-        inherited fields.
-        """
-        # Another option to add the uuid without modifying the actual output schema. Can be accessed with model.Config.schema_extra["uuid"]
-        json_schema_extra = {
-            "uuid": "some-unique-identifier"
-        }
-        arbitrary_types_allowed = True
 
 
 # As a direct template as input for the create_model function, one could directly define the fields dictionary which contains fields
-fields_template = {
-    "uuid": (str, Field(description="Unique identifier", default="12345")),
-    "data": (float, Field(description="This is a description", default=5, required=True)),
-    "another_param": (bool, Field(description="This is a description", default=True, required=False))
+# Create one dictionary for all descriptions and one for all parameters. The keys are the function names and need to match
+
+tool_params = {}
+tool_descriptions = {}
+
+tool_name = "read_h5ad"
+tool_descriptions[tool_name] = "Function to read h5ad files. Available in the anndata.io module"
+tool_params[tool_name] = {
+    "filename": (str, Field(default="dummy.h5ad", description="Path to the .h5ad file")),
+    "backed": (Optional[str], Field(default=None, description="Mode to access file: None, 'r' for read-only")),
+    "as_sparse": (Optional[str], Field(default=None, description="Convert to sparse format: 'csr', 'csc', or None")),
+    "as_sparse_fmt": (Optional[str], Field(default=None, description="Sparse format if converting, e.g., 'csr'")),
+    "index_unique": (Optional[str], Field(default=None, description="Make index unique by appending suffix if needed"))
 }
 
-model = create_model("my_function_name", __doc__="This is a description of the function", **fields_template, __base__=BaseAPIModel)
-print(model.model_json_schema())
-# Or do it with a template dictionary
-# Template dictionary for one function
-template = {"my_function_name": {
-    "title": "my_function_name",
-    "uuid": "some-unique-identifier",
-    "parameters": {
-        "data": {
-            "type": float,          # The Python type or `Any`
-            "description": "This is a description",  # String describing the field
-            "default": 5,    # The field’s default value or `...` if required
-        },
-        "another_param": {
-            "type": bool,
-            "description": "This is a description",
-            "default": True
-        }
-    }
-}
+tool_name = "read_zarr" 
+tool_descriptions[tool_name] = "Function to read Zarr stores. Available in the anndata.io module"
+tool_params[tool_name] = {
+    "filename": (str, Field(default="placeholder.zarr", description="Path or URL to the Zarr store"))
 }
 
-# Build a fields object from the template 
-# Loop through all keys (function names)
-# Loop through all parameters in each function
-# Create field objects for all top level fields. The title (method name) is added directly through the create_model function
-# Create a Field object for each parameter
-# Create a Pydantic model for each function
+def create_model_from_template(tool_params, tool_descriptions):
+    tools = []
+    # validate that keys are equal in tool_params and tool_descriptions
+    if not set(tool_params.keys()) == set(tool_descriptions.keys()):
+        raise ValueError("Keys in tool_params and tool_descriptions must be equal")
+    for tool_name in tool_descriptions.keys():
+        parameters = tool_params[tool_name]
+        tool_description = tool_descriptions[tool_name]
+        tools.append(create_model(tool_name, __doc__=tool_description, **parameters, __base__=BaseAPIModel))
+    return tools
 
-for function_name, function_data in template.items():
-    fields = {}
-    fields["uuid"] = (str, Field(description="Unique identifier", default="12345"))
-    for param_name, param_data in function_data["parameters"].items():
-        fields[param_name] = (param_data["type"], Field(description=param_data["description"], default=param_data["default"]))
-    model = create_model(function_name, **fields, __base__=BaseAPIModel)
-    print(model.model_json_schema())
-# With this usage of the uuid, the uuid has to be popped out of the fields before being passed to the llm
-
-
+tools = create_model_from_template(tool_params, tool_descriptions)
 
 #check if it can be passed to the llm
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import PydanticToolsParser
 
 llm = ChatOpenAI(model="gpt-4-turbo", temperature=0)
-llm_with_tools = llm.bind_tools([model])
-chain = llm_with_tools | PydanticToolsParser(tools=[model])
+llm_with_tools = llm.bind_tools(tools)
+chain = llm_with_tools | PydanticToolsParser(tools=tools)
 query = [
-	("system", "You're an expert data scientist"), 
-	("human", "I want to mark mitochondrial genes of my adata object by checking the basic strings in var_names"),
+	("system", "You're a helpful assistant that parameterizes function calls"), 
+	("human", "I want to read a h5ad file"),
 ]
 result = chain.invoke(query)
-result
+print(result)
