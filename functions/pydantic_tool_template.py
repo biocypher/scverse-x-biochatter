@@ -10,7 +10,8 @@ class BaseAPIModel(BaseModel):
     uuid: str | None = Field(
         None, description="Unique identifier for the model instance"
     )
-    # Another option to add the uuid without modifying the actual output schema. Can be accessed with model.Config.schema_extra["uuid"]
+    # Another option to add the uuid without modifying the actual output schema. Still not entirely sure how to do this
+    # https://docs.pydantic.dev/2.10/api/base_model/#pydantic.BaseModel
     model_config = ConfigDict(arbitrary_types_allowed=True)#, extra="allow")
 
         
