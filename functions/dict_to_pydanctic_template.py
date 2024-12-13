@@ -17,7 +17,7 @@ class BaseAPIModel(BaseModel):
         inherited fields.
         """
         # Another option to add the uuid without modifying the actual output schema. Can be accessed with model.Config.schema_extra["uuid"]
-        schema_extra = {
+        json_schema_extra = {
             "uuid": "some-unique-identifier"
         }
         arbitrary_types_allowed = True
@@ -30,7 +30,7 @@ fields_template = {
     "another_param": (bool, Field(description="This is a description", default=True, required=False))
 }
 
-model = create_model("my_function_name", **fields_template, __base__=BaseAPIModel)
+model = create_model("my_function_name", __doc__="This is a description of the function", **fields_template, __base__=BaseAPIModel)
 print(model.model_json_schema())
 # Or do it with a template dictionary
 # Template dictionary for one function
