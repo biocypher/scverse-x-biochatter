@@ -10,7 +10,8 @@ class BaseAPIModel(BaseModel):
     uuid: str | None = Field(
         None, description="Unique identifier for the model instance"
     )
-    # Another option to add the uuid without modifying the actual output schema. Can be accessed with model.Config.schema_extra["uuid"]
+    # Another option to add the uuid without modifying the actual output schema. Still not entirely sure how to do this
+    # https://docs.pydantic.dev/2.10/api/base_model/#pydantic.BaseModel
     model_config = ConfigDict(arbitrary_types_allowed=True)#, extra="allow")
 
         
@@ -55,9 +56,10 @@ tools = create_model_from_template(tool_params, tool_descriptions)
 #check if it can be passed to the llm
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import PydanticToolsParser
+from typing import Any
 
 llm = ChatOpenAI(model="gpt-4-turbo", temperature=0)
-llm_with_tools = llm.bind_tools(tools)
+llm_with_tools = llm.bind_tools(tools, tool_choice=True)
 chain = llm_with_tools | PydanticToolsParser(tools=tools)
 query = [
 	("system", "You're a helpful assistant that parameterizes function calls"), 
