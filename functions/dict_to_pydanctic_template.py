@@ -42,13 +42,11 @@ template = {"my_function_name": {
             "type": float,          # The Python type or `Any`
             "description": "This is a description",  # String describing the field
             "default": 5,    # The field’s default value or `...` if required
-            "required": True  # Boolean indicating if the field is required
         },
         "another_param": {
             "type": bool,
             "description": "This is a description",
-            "default": True,
-            "required": False
+            "default": True
         }
     }
 }
@@ -65,11 +63,23 @@ for function_name, function_data in template.items():
     fields = {}
     fields["uuid"] = (str, Field(description="Unique identifier", default="12345"))
     for param_name, param_data in function_data["parameters"].items():
-        fields[param_name] = (param_data["type"], Field(description=param_data["description"], default=param_data["default"], required=param_data["required"]))
+        fields[param_name] = (param_data["type"], Field(description=param_data["description"], default=param_data["default"]))
     model = create_model(function_name, **fields, __base__=BaseAPIModel)
     print(model.model_json_schema())
 # With this usage of the uuid, the uuid has to be popped out of the fields before being passed to the llm
 
 
 
+#check if it can be passed to the llm
+from langchain_openai import ChatOpenAI
+from langchain_core.output_parsers import PydanticToolsParser
 
+llm = ChatOpenAI(model="gpt-4-turbo", temperature=0)
+llm_with_tools = llm.bind_tools([model])
+chain = llm_with_tools | PydanticToolsParser(tools=[model])
+query = [
+	("system", "You're an expert data scientist"), 
+	("human", "I want to mark mitochondrial genes of my adata object by checking the basic strings in var_names"),
+]
+result = chain.invoke(query)
+result
